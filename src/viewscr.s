@@ -119,9 +119,9 @@
   next:
 	fopen dskname, O_RDONLY
 	sta fp
-	sty fp+1
+	stx fp+1
 
-	ora fp+1
+	eor fp+1
 	beq errFopen
 
 	jsr cls
