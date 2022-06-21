@@ -1,8 +1,6 @@
 ; vim: set ft=asm6502-2 ts=8:
 
-.feature labels_without_colons
 .feature string_escapes
-.macpack longbranch
 
 ;----------------------------------------------------------------------
 ;			cc65 includes
@@ -24,10 +22,9 @@
 ;----------------------------------------------------------------------
 ;			Orix SDK includes
 ;----------------------------------------------------------------------
-.include "macros/SDK.mac"
-.include "include/SDK.inc"
-.include "macros/types.mac"
-.include "include/errors.inc"
+.include "SDK.mac"
+.include "types.mac"
+.include "errors.inc"
 
 
 ;----------------------------------------------------------------------
@@ -126,12 +123,12 @@
 
 	jsr cls
 
-	fread SCREEN, $1120
+	fread SCREEN, $1120, 1, fp
 	fclose (fp)
 
 	; Attend l'appui sur une touche
   loop:
-	BRK_KERNEL XRD0
+	cgetc
 	beq loop
 	pha
 
@@ -156,7 +153,11 @@
 	sec
 
   error:
-	jmp ermes
+	pha
+	jsr	cmnd_version
+	pla
+	sec
+	jmp	ermes
 .endproc
 
 
@@ -177,9 +178,6 @@
 .proc cls
 	; Efface l'écran
 
-	; CLS
-	;BRK_KERNEL XHIRES
-	;BRK_KERNEL XTEXT
 	; Efface la ligne de status
 	lda #<SCREEN
 	ldy #>SCREEN
@@ -191,8 +189,9 @@
 	ldx #>(SCREEN+1*40)
 	lda #' '
 	BRK_KERNEL XFILLM
+
 	; Efface le reste de l'écran
-	print #$0c, NOSAVE
+	cputc $0c
 
 	rts
 .endproc
@@ -262,6 +261,25 @@
 	rts
 .endproc
 
+;----------------------------------------------------------------------
+;
+; Entrée:
+;
+; Sortie:
+;
+; Variables:
+;	Modifiées:
+;		-
+;	Utilisées:
+;		-
+; Sous-routines:
+;	-
+;----------------------------------------------------------------------
+.proc cmnd_version
+	prints	"viewscr version 1.0 - 2022.2\r\n"
+	rts
+.endproc
+
 ;===========================================================================
 ;		Gestion des erreurs
 ;===========================================================================
@@ -271,21 +289,21 @@
 ;
 ;----------------------------------------------------------------------
 crlf1:
-	BRK_KERNEL XCRLF
+	crlf
 	rts
 
 ;----------------------------------------------------------------------
 ;
 ;----------------------------------------------------------------------
 out1:
-	BRK_KERNEL XWR0
+	cputc
 	rts
 
 ;----------------------------------------------------------------------
 ;
 ;----------------------------------------------------------------------
 .proc prfild
-	print dskname, NOSAVE
+	print dskname
 	rts
 .endproc
 
@@ -293,7 +311,7 @@ out1:
 ;
 ;----------------------------------------------------------------------
 .proc prnamd
-	print dskname, NOSAVE
+	print dskname
 	rts
 .endproc
 
