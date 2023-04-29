@@ -9,17 +9,6 @@
 .include "fcntl.inc"
 
 ;----------------------------------------------------------------------
-;			Orix Kernel includes
-;----------------------------------------------------------------------
-.include "kernel/src/include/kernel.inc"
-
-
-;----------------------------------------------------------------------
-;			Orix Shell includes
-;----------------------------------------------------------------------
-
-
-;----------------------------------------------------------------------
 ;			Orix SDK includes
 ;----------------------------------------------------------------------
 .include "SDK.mac"
@@ -52,8 +41,6 @@
 .export drive
 .exportzp xtrk, psec
 
-;.export dskname
-
 ;----------------------------------------------------------------------
 ;			Librairies
 ;----------------------------------------------------------------------
@@ -62,8 +49,12 @@
 ;----------------------------------------------------------------------
 ; Defines / Constants
 ;----------------------------------------------------------------------
+VERSION = $20232011
+.define PROGNAME "viewscr"
 
-	max_path := KERNEL_MAX_PATH_LENGTH
+KERNEL_MAX_PATH_LENGTH = 49
+
+max_path := KERNEL_MAX_PATH_LENGTH
 
 ;----------------------------------------------------------------------
 ;				Page Zéro
@@ -100,64 +91,85 @@
 .segment "CODE"
 
 .proc _main
+		; Adresse de la ligne de commande
+		ldy	#<BUFEDT
+		lda	#>BUFEDT
 
-	ldy #<(BUFEDT+.strlen("VIEWSCR"))
-	lda #>(BUFEDT+.strlen("VIEWSCR"))
-	sty cbp
-	sta cbp+1
+		; Saute le nom du programme
+		ldy	#$ff
+	loop_pgm:
+		iny
+		lda	(cbp),y
+		clc
+		beq	eol
 
-	; Saute au premier paramètre
-	ldy #$00
-	jsr calposp
+		cmp	#' '
+		bne	loop_pgm
 
-	jsr getfname
-	bcs error
+	eol:
+		; Ici si on a trouvé un ' ' => C=1
+		tya
+		ldy	cbp+1
+		adc	cbp
+		sta	cbp
+		bcc	loop_pgm_end
 
-  next:
-	fopen dskname, O_RDONLY
-	sta fp
-	stx fp+1
+		iny
+	loop_pgm_end:
+		sty	cbp+1
 
-	eor fp+1
-	beq errFopen
+		; Saute au premier paramètre
+		ldy	#$00
+		jsr	calposp
 
-	jsr cls
+		jsr	getfname
+		bcs	error
 
-	fread SCREEN, $1120, 1, fp
-	fclose (fp)
+	next:
+		fopen	dskname, O_RDONLY
+		sta	fp
+		stx	fp+1
 
-	; Attend l'appui sur une touche
-  loop:
-	cgetc
-	beq loop
-	pha
+		eor	fp+1
+		beq	errFopen
 
-	; Efface l'écran
-	jsr cls
+		jsr	cls
 
-	; Fin si CTRL+C
-	pla
-	cmp #$03
-	beq end
+		fread	SCREEN, $1120, 1, fp
+		fclose	(fp)
 
-	; Fichier suivant
-	jsr getfname
-	bcc next
+		; Attend l'appui sur une touche
+	loop:
+		cgetc
+		beq	loop
+		pha
 
-  end:
-	clc
-	rts
+		; Efface l'écran
+		jsr	cls
 
-  errFopen:
-	lda #e13
-	sec
+		; Fin si CTRL+C
+		pla
+		cmp	#$03
+		beq	end
 
-  error:
-	pha
-	jsr	cmnd_version
-	pla
-	sec
-	jmp	ermes
+		; Fichier suivant
+		jsr	getfname
+		bcc	next
+
+	end:
+		clc
+		rts
+
+	errFopen:
+		lda	#e13
+		sec
+
+	error:
+		pha
+		jsr	cmnd_version
+		pla
+		sec
+		jmp	ermes
 .endproc
 
 
@@ -176,24 +188,24 @@
 ;	-
 ;----------------------------------------------------------------------
 .proc cls
-	; Efface l'écran
+		; Efface l'écran
 
-	; Efface la ligne de status
-	lda #<SCREEN
-	ldy #>SCREEN
-	sta RES
-	sty RES+1
-	;ldy #<(SCREEN+28*40)
-	;ldx #>(SCREEN+28*40)
-	ldy #<(SCREEN+1*40)
-	ldx #>(SCREEN+1*40)
-	lda #' '
-	BRK_KERNEL XFILLM
+		; Efface la ligne de status
+		lda	#<SCREEN
+		ldy	#>SCREEN
+		sta	RES
+		sty	RES+1
+		;ldy #<(SCREEN+28*40)
+		;ldx #>(SCREEN+28*40)
+		ldy	#<(SCREEN+1*40)
+		ldx	#>(SCREEN+1*40)
+		lda	#' '
+		.byte $00, XFILLM
 
-	; Efface le reste de l'écran
-	cputc $0c
+		; Efface le reste de l'écran
+		cputc	$0c
 
-	rts
+		rts
 .endproc
 
 
@@ -212,53 +224,38 @@
 ;	-
 ;----------------------------------------------------------------------
 .proc getfname
-	; AY : adresse du paramètre suivant
-	; cbp:   ''          ''
-	;sty dskname
-	;sta dskname+1
+		; AY : adresse du paramètre suivant
+		; cbp:   ''          ''
 
-	ldy #$ff
-  loop:
-	iny
-	lda (cbp),y
-	sta dskname,y
-	beq endloop
-	cmp #$0d
-	beq endloop
-	cmp #' '
-	bne loop
+		ldy	#$ff
+	loop:
+		iny
+		lda	(cbp),y
+		sta	dskname,y
+		beq	endloop
+		cmp	#$0d
+		beq	endloop
+		cmp	#' '
+		bne	loop
 
-  endloop:
-	cpy #00
-	beq error_no_filename
+	endloop:
+		cpy	#00
+		beq	error_no_filename
 
-	; Termine la chaîne par un nul
-;	cmp #$00
-;	beq ajuste
+		; Termine la chaîne par un nul
+		lda	#$00
+		;sta	(cbp),y
+		sta	dskname,y
+		;iny
 
-	lda #$00
-	;sta (cbp),y
-	sta dskname,y
-	;iny
+		; Ajuste cbp
+		jsr	calposp
+		rts
 
-	; Ajuste cbp
-;  ajuste:
-;	clc
-;	tya
-;	adc cbp
-;	sta cbp
-;	bcc skip
-;	inc cbp+1
-;
-;  skip:
-;	clc
-	jsr calposp
-	rts
-
-  error_no_filename:
-	lda #e12
-	sec
-	rts
+	error_no_filename:
+		lda #e12
+		sec
+		rts
 .endproc
 
 ;----------------------------------------------------------------------
@@ -276,8 +273,12 @@
 ;	-
 ;----------------------------------------------------------------------
 .proc cmnd_version
-	prints	"viewscr version 1.0 - 2022.2\r\n"
-	rts
+		.out   .sprintf("%s version %x.%x - %x.%x", PROGNAME, (::VERSION & $ff0)>>4, (::VERSION & $0f), ::VERSION >> 16, (::VERSION & $f000)>>12)
+
+		prints	.sprintf("%s version %x.%x - %x.%x", PROGNAME, (::VERSION & $ff0)>>4, (::VERSION & $0f), ::VERSION >> 16, (::VERSION & $f000)>>12)
+		crlf
+
+		rts
 .endproc
 
 ;===========================================================================
@@ -288,31 +289,33 @@
 ;----------------------------------------------------------------------
 ;
 ;----------------------------------------------------------------------
-crlf1:
-	crlf
-	rts
+.proc crlf1
+		crlf
+		rts
+.endproc
 
 ;----------------------------------------------------------------------
 ;
 ;----------------------------------------------------------------------
-out1:
-	cputc
-	rts
+.proc out1
+		cputc
+		rts
+.endproc
 
 ;----------------------------------------------------------------------
 ;
 ;----------------------------------------------------------------------
 .proc prfild
-	print dskname
-	rts
+		print	dskname
+		rts
 .endproc
 
 ;----------------------------------------------------------------------
 ;
 ;----------------------------------------------------------------------
 .proc prnamd
-	print dskname
-	rts
+		print	dskname
+		rts
 .endproc
 
 
